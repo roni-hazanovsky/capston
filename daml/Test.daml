@@ -1,0 +1,61 @@
+module Test where
+
+import Main
+import Daml.Script
+import DA.Date (date)
+import DA.Date.Types (Month(..))
+
+data Parties = Parties
+  with
+    seller: Party
+    buyer : Party
+
+
+setupParties : Script (Parties)
+setupParties = script do
+
+-- user_setup_begin
+  seller <- allocatePartyWithHint "Seller" (PartyIdHint "Seller")
+  buyer <- allocatePartyWithHint "Buyer" (PartyIdHint "Buyer")
+  sellerId <- validateUserId "seller"
+  buyerId <- validateUserId "buyer"
+  createUser (User sellerId (Some seller)) [CanActAs seller]
+  createUser (User buyerId (Some buyer)) [CanActAs buyer]
+-- user_setup_end
+  let setupParties = Parties with ..
+  return setupParties
+
+testBuyingProcess: Script()
+testBuyingProcess = script do
+    Parties{seller,buyer} <- setupParties
+    let model = "BMW"
+        licensePlateNumber = 3645
+        color = "Red"
+        productionYear = 2020
+        amount = 150000.0
+        currency = "USD"
+        saleDate =  date 2023 May 22
+        carData = CarDetails with ..
+        salesDetails = SalesDetails with ..
+
+    salesProposalCid <- submit seller do
+                            createCmd SalesProposal with ..
+
+    let reason = "The price is too expensive"
+
+    salesRejectionCid <- submit buyer do
+                            exerciseCmd salesProposalCid RejectSalesProposal
+                              with ..
+
+    let newAmount = 120000.0
+        newSalesDetails = SalesDetails with amount = newAmount ;..
+
+    salesProposalCid2 <- submit seller do
+                            exerciseCmd salesRejectionCid ChangeDetails with newSalesDetails
+
+    salesAgreementCid <- submit buyer do
+                            exerciseCmd salesProposalCid2 AcceptSalesProposal
+
+
+    return()
+

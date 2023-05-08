@@ -1,0 +1,64 @@
+module Main where
+
+
+data CarDetails = CarDetails with
+  model               : Text
+  licensePlateNumber  : Int
+  color               : Text
+  productionYear      : Int
+   deriving (Eq,Show)
+
+data SalesDetails = SalesDetails with
+  amount              : Decimal
+  currency            : Text
+  saleDate                : Date
+  carData             : CarDetails
+   deriving (Eq,Show)
+
+template SalesAgreement
+  with
+    seller : Party
+    buyer  : Party
+    salesDetails : SalesDetails
+  where
+    signatory seller, buyer
+
+template SalesProposal
+  with
+    seller: Party
+    buyer : Party
+    salesDetails : SalesDetails
+
+  where
+    signatory seller
+    observer buyer
+    choice AcceptSalesProposal : ContractId SalesAgreement
+      controller buyer
+       do
+        create SalesAgreement with..
+    choice RejectSalesProposal: ContractId SalesRejection
+      with reason : Text
+      controller buyer
+       do
+        create SalesRejection with notes = reason ; ..
+
+    choice RegretProposal : ()
+      controller seller
+       do return()
+
+
+
+template SalesRejection
+  with
+    seller: Party
+    buyer : Party
+    notes :Text      -- the reason of rejection
+  where
+    signatory buyer
+    observer seller
+    ensure notes /= ""
+    nonconsuming choice ChangeDetails : ContractId SalesProposal
+      with newSalesDetails: SalesDetails
+      controller seller
+       do
+        create SalesProposal with salesDetails = newSalesDetails;..
